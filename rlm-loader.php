@@ -1,8 +1,8 @@
 <?php
 /**
- * The core plugin class.
+ * The core WPRateLimiter class.
  *
- * This is used to define internationalization, admin-specific hooks, and
+ * defines internationalization, admin-specific hooks, and
  * public-facing hooks.
  *
  * @package WP_API_Rate_Limiter
@@ -12,6 +12,7 @@
 namespace WPRateLimiter;
 
 use WPRateLimiter\DB\Schema;
+use WPRateLimiter\Core\Middleware; 
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -73,6 +74,7 @@ class RLM_Loader {
 
         // Include other required classes manually for now, will transition to autoloader.
         require_once RLM_PLUGIN_DIR . 'includes/DB/Schema.php';
+        require_once RLM_PLUGIN_DIR . 'includes/Core/Middleware.php';
     }
 
     /**
@@ -107,6 +109,14 @@ class RLM_Loader {
      */
     private function define_public_hooks() {
         // $this->add_filter( 'rest_pre_dispatch', $middleware, 'handle_request' );
+
+        $middleware = new Middleware();
+        
+        // Intercept REST API requests before dispatching.
+        $this->add_filter( 'rest_pre_dispatch', $middleware, 'handle_rest_request', 10, 3 );
+
+        // Intercept Admin-AJAX requests.
+        $this->add_action( 'init', $middleware, 'handle_admin_ajax_request', 1 );
     }
 
     /**
