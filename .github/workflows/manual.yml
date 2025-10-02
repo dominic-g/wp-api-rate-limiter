@@ -1,36 +1,21 @@
-name: 🚀 Deploy Website to FTP
-
-# This workflow runs on every push to the 'main' branch
-on:
-  push:
-    branches:
-      - main
-
+on: push
+name: 🚀 Deploy website on push
 jobs:
   web-deploy:
-    name: 🎉 Deploy to Shared Hosting
+    name: 🎉 Deploy
     runs-on: ubuntu-latest
     steps:
-    - name: 🚚 Get latest code (including submodule)
+    - name: 🚚 Get latest code
       uses: actions/checkout@v3
-      with:
-        # This is the crucial part that tells the action to clone submodules.
-        # 'recursive' handles nested submodules as well, which is a safe practice.
-        submodules: 'recursive'
-        
-        # We provide a Personal Access Token (PAT) so the action has permission
-        # to clone your 'ecomm-base' repository.
-        token: ${{ secrets.PAT_FOR_SUBMODULES }}
-
-    - name: 📂 Sync files to FTP server
+    
+    - name: 📂 Sync files
       uses: SamKirkland/FTP-Deploy-Action@v4.3.4
       with:
-        server: ${{ secrets.FTP_HOST }}  # Use secrets for server details too
+        server: ${{ secrets.FTP_HOST }}
         username: ${{ secrets.FTP_USER }}
         password: ${{ secrets.FTP_PASSWORD }}
         server-dir: ${{ secrets.FTP_REMOTE_DIR }}
-        
-        # --- IMPORTANT: Add Exclusions ---
+
         # This prevents uploading unnecessary or sensitive files.
         exclude: |
           **/.git*
