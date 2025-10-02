@@ -13,6 +13,8 @@ namespace WPRateLimiter;
 
 use WPRateLimiter\DB\Schema;
 use WPRateLimiter\Core\Middleware; 
+use WPRateLimiter\Core\RulesEngine;
+use WPRateLimiter\Core\PolicyEngine;
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -75,6 +77,8 @@ class RLM_Loader {
         // Include other required classes manually for now, will transition to autoloader.
         require_once RLM_PLUGIN_DIR . 'includes/DB/Schema.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/Middleware.php';
+        require_once RLM_PLUGIN_DIR . 'includes/Core/RulesEngine.php';
+        require_once RLM_PLUGIN_DIR . 'includes/Core/PolicyEngine.php'; 
     }
 
     /**
@@ -108,9 +112,9 @@ class RLM_Loader {
      * @access private
      */
     private function define_public_hooks() {
-        // $this->add_filter( 'rest_pre_dispatch', $middleware, 'handle_request' );
-
-        $middleware = new Middleware();
+        $rules_engine  = new RulesEngine();
+        $policy_engine = new PolicyEngine();
+        $middleware    = new Middleware( $rules_engine, $policy_engine ); 
         
         // Intercept REST API requests before dispatching.
         $this->add_filter( 'rest_pre_dispatch', $middleware, 'handle_rest_request', 10, 3 );
@@ -182,6 +186,7 @@ class RLM_Loader {
         
         // Create database tables.
         Schema::create_tables();
+        RulesEngine::initialize_default_limits();
     }
 
     /**

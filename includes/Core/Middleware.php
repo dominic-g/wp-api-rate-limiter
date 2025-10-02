@@ -21,6 +21,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Middleware {
 
     /**
+     * The RulesEngine instance.
+     *
+     * @since 1.0.0
+     * @access private
+     * @var RulesEngine $rules_engine
+     */
+    private $rules_engine;
+
+    /**
+     * The PolicyEngine instance.
+     *
+     * @since 1.0.0
+     * @access private
+     * @var PolicyEngine $policy_engine
+     */
+    private $policy_engine;
+
+    /**
+     * Constructor for the Middleware class.
+     *
+     * @since 1.0.0
+     * @param RulesEngine  $rules_engine  The rules engine instance.
+     * @param PolicyEngine $policy_engine The policy engine instance.
+     */
+    public function __construct( RulesEngine $rules_engine, PolicyEngine $policy_engine ) {
+        $this->rules_engine  = $rules_engine;
+        $this->policy_engine = $policy_engine;
+    }
+
+    /**
      * Handles the interception of REST API requests.
      *
      * This filter runs early in the REST API request process,
@@ -33,10 +63,6 @@ class Middleware {
      * @return WP_REST_Response|WP_Error|mixed The original response, or a new response if blocked.
      */
     public function handle_rest_request( $response, $handler, $request ) {
-        // For MVP, just log/debug that we caught it.
-        // Later, this is where we'll call RulesEngine and PolicyEngine.
-        error_log( 'RLM: Intercepted REST request: ' . $request->get_route() . ' by ' . $this->get_request_identifier( $request ) );
-
         // In the future, if blocked:
         // return new \WP_REST_Response(
         //     [
@@ -49,6 +75,16 @@ class Middleware {
         //     ],
         //     429
         // );
+
+        $ip      = $this->get_client_ip();
+        $user_id = get_current_user_id();
+        $endpoint = $request->get_route();
+
+        $check_result = $this->rules_engine->check_request( $ip, $user_id, $endpoint );
+
+        if ( $check_result['blocked'] ) {
+            return $this->policy_engine->block_rest_request( $check_result['retry_after'] );
+        }
 
         return $response;
     }
@@ -65,16 +101,16 @@ class Middleware {
             return;
         }
 
-        // For MVP, just log/debug that we caught it.
-        // Later, this is where we'll call RulesEngine and PolicyEngine.
-        $action = isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : 'unknown_ajax_action';
-        error_log( 'RLM: Intercepted Admin-AJAX request: ' . $action . ' by ' . $this->get_request_identifier( null, $action ) );
+        $ip      = $this->get_client_ip();
+        $user_id = get_current_user_id();
+        $ajax_action = isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : 'unknown_ajax_action';
+        $endpoint = 'admin-ajax:' . $ajax_action; // Standardize endpoint for AJAX.
 
-        // If an AJAX request is blocked, we would typically short-circuit.
-        // For now, let it pass.
-        // header( 'Content-Type: application/json', true, 429 );
-        // echo json_encode( [ 'success' => false, 'data' => [ 'message' => __( 'Rate limit exceeded.', 'wp-api-rate-limiter' ) ] ] );
-        // wp_die();
+        $check_result = $this->rules_engine->check_request( $ip, $user_id, $endpoint );
+
+        if ( $check_result['blocked'] ) {
+            $this->policy_engine->block_admin_ajax_request( $check_result['retry_after'] );
+        }
     }
 
     /**
