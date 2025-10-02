@@ -1,0 +1,19 @@
+{
+    "name": "dominic-n/wp-api-rate-limiter",
+    "description": "WordPress plugin for API rate limiting and request monitoring.",
+    "type": "wordpress-plugin",
+    "license": "GPL-3.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "WPRateLimiter\\": "includes/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Dominic Gitau",
+            "email": "dominicnjoroge2@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {}
+}
