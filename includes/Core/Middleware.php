@@ -8,6 +8,10 @@
 
 namespace WPRateLimiter\Core;
 
+use WPRateLimiter\Core\RulesEngine;
+use WPRateLimiter\Core\PolicyEngine;
+use WPRateLimiter\Core\RequestLogger;
+
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -39,15 +43,71 @@ class Middleware {
     private $policy_engine;
 
     /**
+     * The RequestLogger instance.
+     *
+     * @since 1.0.0
+     * @access private
+     * @var RequestLogger $request_logger
+     */
+    private $request_logger;
+
+    /**
+     * Temporary storage for request data before final logging (e.g., awaiting status code).
+     *
+     * @since 1.0.0
+     * @access private
+     * @var array $request_start_data
+     */
+    private $request_start_data = [];
+
+    /**
      * Constructor for the Middleware class.
      *
      * @since 1.0.0
-     * @param RulesEngine  $rules_engine  The rules engine instance.
-     * @param PolicyEngine $policy_engine The policy engine instance.
+     * @param RulesEngine   $rules_engine   The rules engine instance.
+     * @param PolicyEngine  $policy_engine  The policy engine instance.
+     * @param RequestLogger $request_logger The request logger instance.
      */
-    public function __construct( RulesEngine $rules_engine, PolicyEngine $policy_engine ) {
-        $this->rules_engine  = $rules_engine;
-        $this->policy_engine = $policy_engine;
+    public function __construct( RulesEngine $rules_engine, PolicyEngine $policy_engine, RequestLogger $request_logger ) {
+        $this->rules_engine   = $rules_engine;
+        $this->policy_engine  = $policy_engine;
+        $this->request_logger = $request_logger;
+    }
+
+    /**
+     * Initializes request data at the start of a REST or AJAX request.
+     *
+     * @since 1.0.0
+     * @param string $request_type 'rest' or 'ajax'.
+     * @param string $endpoint The endpoint string.
+     * @param string $method The HTTP method.
+     * @return array Initial request data array.
+     */
+    private function initialize_request_data( $request_type, $endpoint, $method ) {
+        $ip      = $this->get_client_ip();
+        $user_id = get_current_user_id();
+        $user_role = null;
+        if ( $user_id ) {
+            $user = get_user_by( 'id', $user_id );
+            if ( $user && ! empty( $user->roles ) ) {
+                $user_role = $user->roles[0];
+            }
+        }
+
+        $data = [
+            'request_time' => current_time( 'mysql', true ),
+            'ip'           => $ip,
+            'method'       => $method,
+            'endpoint'     => $endpoint,
+            'user_id'      => $user_id ?: null,
+            'user_role'    => $user_role,
+            'is_blocked'   => 0,
+            'response_ms'  => null,
+            'status_code'  => null,
+            'bytes'        => null,
+            'meta'         => [],
+        ];
+        return $data;
     }
 
     /**
@@ -57,35 +117,60 @@ class Middleware {
      * before the actual endpoint handler is dispatched.
      *
      * @since 1.0.0
-     * @param WP_REST_Response|WP_Error|mixed $response The response object.
+     * @param \WP_REST_Response|\WP_Error|mixed $response The response object.
      * @param array $handler The handler for the request.
-     * @param WP_REST_Request $request The request object.
-     * @return WP_REST_Response|WP_Error|mixed The original response, or a new response if blocked.
+     * @param \WP_REST_Request $request The request object.
+     * @return \WP_REST_Response|\WP_Error|mixed The original response, or a new response if blocked.
      */
-    public function handle_rest_request( $response, $handler, $request ) {
-        // In the future, if blocked:
-        // return new \WP_REST_Response(
-        //     [
-        //         'code' => 'rlm_rate_limit_exceeded',
-        //         'message' => __( 'You have exceeded the API rate limit.', 'wp-api-rate-limiter' ),
-        //         'data' => [
-        //             'status' => 429,
-        //             'retry_after' => 60, // Example
-        //         ],
-        //     ],
-        //     429
-        // );
-
-        $ip      = $this->get_client_ip();
-        $user_id = get_current_user_id();
+    public function handle_rest_pre_dispatch( $response, $handler, $request ) {
         $endpoint = $request->get_route();
+        $method   = $request->get_method();
+        $ip       = $this->get_client_ip();
+        $user_id  = get_current_user_id();
+
+        $this->request_start_data['rest'] = $this->initialize_request_data( 'rest', $endpoint, $method );
+        $request_start_time = microtime( true );
 
         $check_result = $this->rules_engine->check_request( $ip, $user_id, $endpoint );
 
         if ( $check_result['blocked'] ) {
-            return $this->policy_engine->block_rest_request( $check_result['retry_after'] );
+            $response = $this->policy_engine->block_rest_request( $check_result['retry_after'] );
+            // Log immediately if blocked, as it short-circuits.
+            $this->request_start_data['rest']['is_blocked']  = 1;
+            $this->request_start_data['rest']['status_code'] = 429;
+            $this->request_start_data['rest']['response_ms'] = round( ( microtime( true ) - $request_start_time ) * 1000 );
+            $this->request_logger->log_request( $this->request_start_data['rest'] );
+            unset( $this->request_start_data['rest'] ); // Clear temporary data
         }
 
+        // Store start time for post-dispatch logging.
+        $this->request_start_data['rest']['_start_time'] = $request_start_time;
+
+        return $response;
+    }
+
+    /**
+     * Logs REST API request details after dispatch.
+     *
+     * @since 1.0.0
+     * @param \WP_REST_Response $response The response object.
+     * @param \WP_REST_Server $handler The handler for the request.
+     * @param \WP_REST_Request $request The request object.
+     * @return \WP_REST_Response The original response.
+     */
+    public function handle_rest_post_dispatch( $response, $handler, $request ) {
+        // Only log if not already blocked and logged by pre-dispatch.
+        if ( isset( $this->request_start_data['rest'] ) && ! $this->request_start_data['rest']['is_blocked'] ) {
+            $log_data = $this->request_start_data['rest'];
+            $request_start_time = $log_data['_start_time'];
+
+            $log_data['response_ms'] = round( ( microtime( true ) - $request_start_time ) * 1000 );
+            $log_data['status_code'] = $response->get_status();
+            $log_data['bytes']       = isset( $_SERVER['HTTP_CONTENT_LENGTH'] ) ? (int) $_SERVER['HTTP_CONTENT_LENGTH'] : null;
+
+            $this->request_logger->log_request( $log_data );
+            unset( $this->request_start_data['rest'] ); // Clear temp data
+        }
         return $response;
     }
 
@@ -101,44 +186,55 @@ class Middleware {
             return;
         }
 
+        $ajax_action = isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : 'unknown_ajax_action';
+        $endpoint    = 'admin-ajax:' . $ajax_action;
+        $method      = $_SERVER['REQUEST_METHOD'] ?? 'POST';
+
         $ip      = $this->get_client_ip();
         $user_id = get_current_user_id();
-        $ajax_action = isset( $_REQUEST['action'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) : 'unknown_ajax_action';
-        $endpoint = 'admin-ajax:' . $ajax_action; // Standardize endpoint for AJAX.
+
+        $this->request_start_data['ajax'] = $this->initialize_request_data( 'ajax', $endpoint, $method );
+        $request_start_time = microtime( true );
 
         $check_result = $this->rules_engine->check_request( $ip, $user_id, $endpoint );
 
         if ( $check_result['blocked'] ) {
-            $this->policy_engine->block_admin_ajax_request( $check_result['retry_after'] );
+            $this->request_start_data['ajax']['is_blocked']  = 1;
+            $this->request_start_data['ajax']['status_code'] = 429;
+            $this->request_start_data['ajax']['response_ms'] = round( ( microtime( true ) - $request_start_time ) * 1000 );
+            $this->request_logger->log_request( $this->request_start_data['ajax'] );
+
+            $this->policy_engine->block_admin_ajax_request( $check_result['retry_after'] ); // This will wp_die()
+            // Execution stops here for blocked AJAX requests, so no need for post-dispatch.
+        } else {
+            // For allowed AJAX requests, we need to log AFTER the action completes.
+            // Hook into shutdown to capture final status if possible.
+            $this->request_start_data['ajax']['_start_time'] = $request_start_time;
+            add_action( 'shutdown', [ $this, 'handle_admin_ajax_shutdown_log' ] );
         }
     }
 
     /**
-     * Gets a unique identifier for the current request context.
+     * Logs Admin-AJAX request details during shutdown for allowed requests.
+     * This is a best-effort approach to capture status for AJAX.
      *
      * @since 1.0.0
-     * @param \WP_REST_Request|null $request The REST request object.
-     * @param string $ajax_action The admin-ajax action if applicable.
-     * @return string Identifier combining user/IP.
      */
-    private function get_request_identifier( $request = null, $ajax_action = '' ) {
-        $user_id = get_current_user_id();
-        $ip = $this->get_client_ip();
+    public function handle_admin_ajax_shutdown_log() {
+        if ( isset( $this->request_start_data['ajax'] ) && ! $this->request_start_data['ajax']['is_blocked'] ) {
+            $log_data = $this->request_start_data['ajax'];
+            $request_start_time = $log_data['_start_time'];
 
-        if ( $user_id ) {
-            $user = get_user_by( 'id', $user_id );
-            $identifier = 'user:' . $user_id . '(' . ( $user ? $user->user_login : 'unknown' ) . ')';
-        } else {
-            $identifier = 'ip:' . $ip . '(unauthenticated)';
-        }
+            $log_data['response_ms'] = round( ( microtime( true ) - $request_start_time ) * 1000 );
+            // Attempt to get status code, though for AJAX it's usually 200 unless wp_die() or error.
+            $log_data['status_code'] = http_response_code() ?: 200;
+            $log_data['bytes']       = isset( $_SERVER['HTTP_CONTENT_LENGTH'] ) ? (int) $_SERVER['HTTP_CONTENT_LENGTH'] : null;
 
-        if ( $request ) {
-            $identifier .= ' - ' . $request->get_route();
-        } elseif ( $ajax_action ) {
-            $identifier .= ' - ajax:' . $ajax_action;
+            $this->request_logger->log_request( $log_data );
+            unset( $this->request_start_data['ajax'] ); // Clear temporary data
         }
-        return $identifier;
     }
+
 
     /**
      * Gets the client IP address, accounting for proxies.
@@ -147,15 +243,14 @@ class Middleware {
      * @return string The client IP address.
      */
     private function get_client_ip() {
-        // TODO: Later implement trusted proxies logic.
+        // TODO: Later implement trusted proxies logic and make this configurable.
         $ip = '0.0.0.0'; // Default unknown.
 
         if ( isset( $_SERVER['HTTP_CLIENT_IP'] ) ) {
             $ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CLIENT_IP'] ) );
         } elseif ( isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
             $ips = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
-            // Get the first non-private IP, or the last if all are private.
-            $ip = trim( end( $ips ) );
+            $ip = trim( end( $ips ) ); // Get the last IP, assuming it's the client's.
         } elseif ( isset( $_SERVER['HTTP_X_FORWARDED'] ) ) {
             $ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED'] ) );
         } elseif ( isset( $_SERVER['HTTP_FORWARDED_FOR'] ) ) {

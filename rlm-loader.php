@@ -12,9 +12,11 @@
 namespace WPRateLimiter;
 
 use WPRateLimiter\DB\Schema;
+use WPRateLimiter\DB\RequestModel;
 use WPRateLimiter\Core\Middleware; 
 use WPRateLimiter\Core\RulesEngine;
 use WPRateLimiter\Core\PolicyEngine;
+use WPRateLimiter\Core\RequestLogger;
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -76,9 +78,11 @@ class RLM_Loader {
 
         // Include other required classes manually for now, will transition to autoloader.
         require_once RLM_PLUGIN_DIR . 'includes/DB/Schema.php';
+        require_once RLM_PLUGIN_DIR . 'includes/DB/RequestModel.php'; 
         require_once RLM_PLUGIN_DIR . 'includes/Core/Middleware.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/RulesEngine.php';
-        require_once RLM_PLUGIN_DIR . 'includes/Core/PolicyEngine.php'; 
+        require_once RLM_PLUGIN_DIR . 'includes/Core/PolicyEngine.php';
+        require_once RLM_PLUGIN_DIR . 'includes/Core/RequestLogger.php'; 
     }
 
     /**

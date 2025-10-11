@@ -35,7 +35,7 @@ define( 'WP_TESTS_TITLE', 'Test Blog' );
 define( 'WP_TESTS_DOMAIN', 'example.org' );
 define( 'WP_TESTS_PATH', '$WP_CORE_DIR' );
 define( 'WP_DEBUG', true );
-define( 'ABSPATH', '$WP_TESTS_DIR/' ); // Adjusted ABSPATH for the test environment.
+define( 'ABSPATH', '$WP_TESTS_DIR/' );
 \$table_prefix = 'wptests_';
 require_once '$WP_TESTS_DIR/includes/functions.php';
 
