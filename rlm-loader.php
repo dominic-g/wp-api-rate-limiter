@@ -129,7 +129,7 @@ class RLM_Loader {
         $policy_engine = new PolicyEngine();
         $request_model  = new RequestModel(); 
         $request_logger = new RequestLogger( $request_model );
-        $middleware    = new Middleware( $rules_engine, $policy_engine ); 
+        $middleware     = new Middleware( $rules_engine, $policy_engine, $request_logger );
         $rest_api       = new RestAPI( $request_model );
         
         // Intercept REST API requests before dispatching.
