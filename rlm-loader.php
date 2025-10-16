@@ -17,6 +17,9 @@ use WPRateLimiter\Core\Middleware;
 use WPRateLimiter\Core\RulesEngine;
 use WPRateLimiter\Core\PolicyEngine;
 use WPRateLimiter\Core\RequestLogger;
+use WPRateLimiter\Admin\AdminPage;
+use WPRateLimiter\Admin\RestAPI;
+use WPRateLimiter\Admin\Settings; 
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -83,6 +86,9 @@ class RLM_Loader {
         require_once RLM_PLUGIN_DIR . 'includes/Core/RulesEngine.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/PolicyEngine.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/RequestLogger.php'; 
+        require_once RLM_PLUGIN_DIR . 'includes/Admin/AdminPage.php';
+        require_once RLM_PLUGIN_DIR . 'includes/Admin/RestAPI.php'; 
+        require_once RLM_PLUGIN_DIR . 'includes/Admin/Settings.php';   
     }
 
     /**
@@ -107,6 +113,9 @@ class RLM_Loader {
      */
     private function define_admin_hooks() {
         // $this->add_action( 'admin_menu', $admin_page_handler, 'add_menu_page' );
+        $admin_page = new AdminPage();
+        $this->add_action( 'admin_menu', $admin_page, 'add_admin_menu' );
+        $this->add_action( 'admin_enqueue_scripts', $admin_page, 'enqueue_admin_assets' );
     }
 
     /**
@@ -118,13 +127,19 @@ class RLM_Loader {
     private function define_public_hooks() {
         $rules_engine  = new RulesEngine();
         $policy_engine = new PolicyEngine();
+        $request_model  = new RequestModel(); 
+        $request_logger = new RequestLogger( $request_model );
         $middleware    = new Middleware( $rules_engine, $policy_engine ); 
+        $rest_api       = new RestAPI( $request_model );
         
         // Intercept REST API requests before dispatching.
         $this->add_filter( 'rest_pre_dispatch', $middleware, 'handle_rest_request', 10, 3 );
-
+        // Log REST API requests after dispatch (for status code and response time).
+        $this->add_filter( 'rest_post_dispatch', $middleware, 'handle_rest_post_dispatch', 10, 3 );
         // Intercept Admin-AJAX requests.
         $this->add_action( 'init', $middleware, 'handle_admin_ajax_request', 1 );
+        // Register custom REST API routes for the dashboard.
+        $this->add_action( 'rest_api_init', $rest_api, 'register_routes' );
     }
 
     /**
