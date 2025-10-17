@@ -1,0 +1,24 @@
+{
+  "name": "rlm-admin-dashboard",
+  "version": "1.0.0",
+  "description": "React dashboard for WP API Rate Limiter plugin.",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start"
+  },
+  "keywords": [],
+  "author": "Dominic Gitau",
+  "license": "GPL-2.0-or-later",
+  "devDependencies": {
+    "@wordpress/scripts": "^30.25.0"
+  },
+  "dependencies": {
+    "@wordpress/api": "^5.10.0",
+    "@wordpress/components": "^23.2.0",
+    "@wordpress/data": "^9.10.0",
+    "@wordpress/element": "^5.10.0",
+    "@wordpress/i18n": "^4.36.0",
+    "@wordpress/url": "^3.12.0"
+  }
+}

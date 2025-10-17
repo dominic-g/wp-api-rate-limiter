@@ -116,6 +116,7 @@ class RLM_Loader {
         $admin_page = new AdminPage();
         $this->add_action( 'admin_menu', $admin_page, 'add_admin_menu' );
         $this->add_action( 'admin_enqueue_scripts', $admin_page, 'enqueue_admin_assets' );
+        $this->add_action( 'admin_enqueue_scripts', $admin_page, 'enqueue_admin_assets_later', 100 );
     }
 
     /**
