@@ -165,6 +165,21 @@ class RestAPI {
             'top_ips_today'          => $top_ips,
             // will add avg response time, requests/min (real-time from cache) later.
         ];
+        $kpis = [
+            'total_requests_today'   => (int) $total_requests_today,
+            'blocked_requests_today' => (int) $blocked_requests_today,
+            'percentage_blocked'     => ( $total_requests_today > 0 ) ? round( ( $blocked_requests_today / $total_requests_today ) * 100, 2 ) : 0,
+            'top_ips_today'          => $top_ips,
+            // Add debug info here
+            'debug_info'             => [
+                'endpoint_accessed_by_user_id' => get_current_user_id(),
+                'endpoint_accessed_is_logged_in' => is_user_logged_in() ? 'true' : 'false',
+                'endpoint_accessed_can_manage_options' => current_user_can( 'manage_options' ) ? 'true' : 'false',
+                'site_url' => get_site_url(),
+                'home_url' => get_home_url(),
+                'rest_url' => rest_url(),
+            ],
+        ];
 
         return new \WP_REST_Response( $kpis, 200 );
     }
