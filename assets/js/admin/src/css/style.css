@@ -26,5 +26,34 @@
 }
 
 #rlm-admin-app .rlm-dashboard-wrapper {
-    margin-right: 20px; /* Give some space from the right edge */
+    margin-right: 20px;
+}
+
+
+.rlm-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5em;
+    margin-bottom: 2em;
+}
+
+.rlm-charts-grid .components-card {
+    padding: 1.5em;
+}
+
+.rlm-country-distribution {
+    margin-top: 2em;
+    padding: 1.5em;
+}
+
+.rlm-country-distribution ul {
+    list-style: disc;
+    margin-left: 20px;
+}
+
+.rlm-chart-note {
+    font-size: 0.9em;
+    color: #666;
+    font-style: italic;
+    margin-top: 1em;
 }

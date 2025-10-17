@@ -79,6 +79,17 @@ class RestAPI {
             ],
         ] );
 
+        // Endpoint for chart data (requests over time, blocked over time)
+        register_rest_route( $namespace, '/chart-data', [
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => [ $this, 'get_chart_data' ],
+            'permission_callback' => [ $this, 'get_items_permissions_check' ],
+            'args'                => [
+                // Will add 'start_date', 'end_date', 'interval' later.
+                // For now, it fetches data for the last 24 hours (or configurable period).
+            ],
+        ] );
+
     }
 
     /**
@@ -94,15 +105,6 @@ class RestAPI {
         $user_id            = get_current_user_id();
         $is_user_logged_in  = is_user_logged_in();
         $can_manage_options = current_user_can( 'manage_options' );
-        error_log( sprintf(
-            'RLM DEBUG: Permissions Check (TEMPORARILY BYPASSED) - Endpoint: %s | User ID: %d | Is Logged In: %s | Can Manage Options: %s | WP_DEBUG_LOG: %s',
-            $request->get_route(),
-            $user_id,
-            $is_user_logged_in ? 'true' : 'false',
-            $can_manage_options ? 'true' : 'false',
-            defined('WP_DEBUG_LOG') && WP_DEBUG_LOG ? 'true' : 'false'
-        ) );
-        return true;
 
         error_log( sprintf(
             'RLM REST Permissions Check - Endpoint: %s | User ID: %d | Is Logged In: %s | Can Manage Options: %s',
@@ -165,21 +167,6 @@ class RestAPI {
             'top_ips_today'          => $top_ips,
             // will add avg response time, requests/min (real-time from cache) later.
         ];
-        $kpis = [
-            'total_requests_today'   => (int) $total_requests_today,
-            'blocked_requests_today' => (int) $blocked_requests_today,
-            'percentage_blocked'     => ( $total_requests_today > 0 ) ? round( ( $blocked_requests_today / $total_requests_today ) * 100, 2 ) : 0,
-            'top_ips_today'          => $top_ips,
-            // Add debug info here
-            'debug_info'             => [
-                'endpoint_accessed_by_user_id' => get_current_user_id(),
-                'endpoint_accessed_is_logged_in' => is_user_logged_in() ? 'true' : 'false',
-                'endpoint_accessed_can_manage_options' => current_user_can( 'manage_options' ) ? 'true' : 'false',
-                'site_url' => get_site_url(),
-                'home_url' => get_home_url(),
-                'rest_url' => rest_url(),
-            ],
-        ];
 
         return new \WP_REST_Response( $kpis, 200 );
     }
@@ -224,5 +211,72 @@ class RestAPI {
         }, $recent_requests );
 
         return new \WP_REST_Response( $formatted_requests, 200 );
+    }
+
+
+    
+    /**
+     * Callback for the /chart-data endpoint.
+     * Provides data for "Requests Over Time" and "Blocked Requests Over Time" charts.
+     *
+     * @since 1.0.0
+     * @param \WP_REST_Request $request The request object.
+     * @return \WP_REST_Response The response object.
+     */
+    public function get_chart_data( \WP_REST_Request $request ) {
+        global $wpdb;
+        $table_requests = $wpdb->prefix . RequestModel::TABLE_NAME;
+
+        // For MVP, get data for the last 24 hours.
+        $one_day_ago = gmdate( 'Y-m-d H:i:s', strtotime( '-24 hours', current_time( 'timestamp', true ) ) );
+
+        // Fetch raw data for requests and blocked status
+        $results = $wpdb->get_results( $wpdb->prepare(
+            "SELECT request_time, is_blocked FROM `{$table_requests}` WHERE request_time >= %s ORDER BY request_time ASC",
+            $one_day_ago
+        ) );
+
+        $hourly_data = [];
+        $current_hour = floor( current_time( 'timestamp', true ) / 3600 ) * 3600; // Start of current UTC hour.
+
+        // Initialize hourly data for the last 24 hours
+        for ($i = 23; $i >= 0; $i--) {
+            $hour_timestamp = $current_hour - ($i * 3600);
+            $label = gmdate( 'H:00', $hour_timestamp ); // e.g., "14:00"
+            $hourly_data[$label] = ['total' => 0, 'blocked' => 0];
+        }
+
+        foreach ( $results as $row ) {
+            $timestamp = strtotime( $row->request_time . ' UTC' ); // Treat DB time as UTC for accurate grouping
+            $hour_label = gmdate( 'H:00', $timestamp );
+
+            if ( isset( $hourly_data[ $hour_label ] ) ) {
+                $hourly_data[ $hour_label ]['total']++;
+                if ( (bool) $row->is_blocked ) {
+                    $hourly_data[ $hour_label ]['blocked']++;
+                }
+            }
+            // If data is older than our 24h window, it will be ignored by initialization
+        }
+
+        $labels        = array_keys( $hourly_data );
+        $total_requests_data = array_column( $hourly_data, 'total' );
+        $blocked_requests_data = array_column( $hourly_data, 'blocked' );
+
+        $chart_data = [
+            'labels'              => $labels,
+            'total_requests_data' => $total_requests_data,
+            'blocked_requests_data' => $blocked_requests_data,
+            // Placeholder for country data (will populate properly with GeoIP later)
+            'country_data'        => [
+                ['country' => 'US', 'count' => 100],
+                ['country' => 'DE', 'count' => 50],
+                ['country' => 'GB', 'count' => 30],
+                ['country' => 'CA', 'count' => 20],
+                ['country' => 'AU', 'count' => 15],
+            ],
+        ];
+
+        return new \WP_REST_Response( $chart_data, 200 );
     }
 }

@@ -14,11 +14,13 @@
     "@wordpress/scripts": "^30.25.0"
   },
   "dependencies": {
-    "@wordpress/api": "^5.10.0",
+    "@wordpress/api-fetch": "^6.4.0",
     "@wordpress/components": "^23.2.0",
     "@wordpress/data": "^9.10.0",
     "@wordpress/element": "^5.10.0",
     "@wordpress/i18n": "^4.36.0",
-    "@wordpress/url": "^3.12.0"
+    "@wordpress/url": "^3.12.0",
+    "chart.js": "^4.4.0",
+    "react-chartjs-2": "^5.2.0" 
   }
 }

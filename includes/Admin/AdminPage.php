@@ -83,8 +83,6 @@ class AdminPage {
                 $file_version = $asset_config['version'] ?? RLM_PLUGIN_VERSION;
                 error_log( 'RLM: Asset config loaded. Dependencies: ' . implode(', ', $dependencies) . ' | Version: ' . $file_version );
 
-                // Remove 'react-jsx-runtime' from the dependencies, as we are now using 'classic' runtime.
-                // It will be replaced implicitly by 'wp-element' providing the React global.
                 $dependencies = array_filter( $dependencies, fn($dep) => $dep !== 'react-jsx-runtime' );
 
                 // Ensure 'wp-element' is always a dependency, as it provides the React global.
@@ -96,8 +94,8 @@ class AdminPage {
                 if ( ! in_array( 'wp-api-fetch', $dependencies, true ) ) { $dependencies[] = 'wp-api-fetch'; }
                 if ( ! in_array( 'wp-components', $dependencies, true ) ) { $dependencies[] = 'wp-components'; }
                 if ( ! in_array( 'wp-i18n', $dependencies, true ) ) { $dependencies[] = 'wp-i18n'; }
-                // Remove 'react-jsx-runtime' if it somehow still appears after filtering
-                $dependencies = array_values( array_unique( $dependencies ) ); // Clean up and re-index.
+                
+                $dependencies = array_values( array_unique( $dependencies ) ); 
 
 
             } else {
@@ -143,6 +141,15 @@ class AdminPage {
                         __( 'No', 'wp-api-rate-limiter' ),
                         __( 'Top 5 Offending IPs Today', 'wp-api-rate-limiter' ),
                         __( 'requests', 'wp-api-rate-limiter' ),
+                        __( 'Requests Over Time (Last 24h)', 'wp-api-rate-limiter' ),
+                        __( 'No chart data available.', 'wp-api-rate-limiter' ),    
+                        __( 'Total Requests', 'wp-api-rate-limiter' ),              
+                        __( 'Blocked Requests', 'wp-api-rate-limiter' ),            
+                        __( 'Number of Requests', 'wp-api-rate-limiter' ),          
+                        __( 'Hour (UTC)', 'wp-api-rate-limiter' ),                  
+                        __( 'User Distribution by Country', 'wp-api-rate-limiter' ),
+                        __( 'This section will feature an interactive map with GeoIP data in a future version.', 'wp-api-rate-limiter' ),
+                        __( 'Data is currently mock/aggregated by IP. Full GeoIP coming soon.', 'wp-api-rate-limiter' ),
                     ],
                 ]
             );
