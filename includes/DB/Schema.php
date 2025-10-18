@@ -38,6 +38,7 @@ class Schema {
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             request_time DATETIME NOT NULL DEFAULT '0000-00-00 00:00:00',
             ip VARCHAR(45) NOT NULL DEFAULT '',
+            country_code VARCHAR(2) NULL,
             method VARCHAR(8) NOT NULL DEFAULT '',
             endpoint VARCHAR(191) NOT NULL DEFAULT '',
             user_id BIGINT(20) UNSIGNED NULL,
@@ -50,9 +51,40 @@ class Schema {
             PRIMARY KEY (id),
             KEY request_time (request_time),
             KEY ip (ip),
-            KEY endpoint (endpoint)
+            KEY endpoint (endpoint),
+            KEY country_code (country_code)
         ) {$charset_collate};";
         dbDelta( $sql_requests );
+
+
+        $sql_geoip_cache = "CREATE TABLE `{$table_prefix}geoip_cache` (
+            ip VARCHAR(45) NOT NULL,
+            continent VARCHAR(50) NULL,
+            continent_code VARCHAR(2) NULL,
+            country VARCHAR(50) NULL,
+            country_code VARCHAR(2) NULL,
+            capital VARCHAR(100) NULL,
+            region VARCHAR(100) NULL,
+            region_code VARCHAR(10) NULL,
+            city VARCHAR(100) NULL,
+            postal_code VARCHAR(20) NULL,
+            dial_code VARCHAR(10) NULL,
+            is_in_eu TINYINT(1) NULL,
+            latitude DECIMAL(10,7) NULL,
+            longitude DECIMAL(10,7) NULL,
+            accuracy_radius INT(10) UNSIGNED NULL,
+            timezone JSON NULL,
+            currency JSON NULL,
+            connection JSON NULL,
+            security JSON NULL,
+            is_vpn TINYINT(1) NULL,
+            is_tor TINYINT(1) NULL,
+            is_threat VARCHAR(50) NULL,
+            checked_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (ip),
+            KEY country_code (country_code)
+        ) {$charset_collate};";
+        dbDelta( $sql_geoip_cache );
 
         // Table: wp_rlm_aggregates
         $sql_aggregates = "CREATE TABLE `{$table_prefix}aggregates` (
@@ -114,8 +146,6 @@ class Schema {
 
     /**
      * Drops all plugin database tables.
-     *
-     * WARNING: Use with extreme caution, mainly for development or uninstall.
      *
      * @since 1.0.0
      */

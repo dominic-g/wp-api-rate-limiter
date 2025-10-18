@@ -44,6 +44,7 @@ class RequestModel {
         $formats = [
             '%s', // request_time
             '%s', // ip
+            '%s', // country_code
             '%s', // method
             '%s', // endpoint
             '%d', // user_id
@@ -55,10 +56,11 @@ class RequestModel {
             '%s', // meta (JSON)
         ];
 
-        // Ensure all keys are present, even if null, to match formats array.
+        // all keys shod be present, even if null, to match formats array.
         $data = wp_parse_args( $data, [
             'request_time' => current_time( 'mysql', true ),
             'ip'           => '0.0.0.0',
+            'country_code' => null,
             'method'       => 'GET',
             'endpoint'     => '',
             'user_id'      => null,
@@ -81,7 +83,7 @@ class RequestModel {
         // Remove array keys not defined in the table schema explicitly to prevent errors
         $insert_data = [];
         $insert_formats = [];
-        $schema_columns = ['request_time', 'ip', 'method', 'endpoint', 'user_id', 'user_role', 'status_code', 'response_ms', 'bytes', 'is_blocked', 'meta'];
+        $schema_columns = ['request_time', 'ip', 'country_code', 'method', 'endpoint', 'user_id', 'user_role', 'status_code', 'response_ms', 'bytes', 'is_blocked', 'meta'];
 
         foreach ($schema_columns as $column) {
             if (isset($data[$column])) {

@@ -11,6 +11,7 @@ namespace WPRateLimiter\Core;
 use WPRateLimiter\Core\RulesEngine;
 use WPRateLimiter\Core\PolicyEngine;
 use WPRateLimiter\Core\RequestLogger;
+use WPRateLimiter\GeoIP\GeoIPLookup;
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -52,6 +53,15 @@ class Middleware {
     private $request_logger;
 
     /**
+     * The GeoIPLookup instance.
+     *
+     * @since 1.0.0
+     * @access private
+     * @var GeoIPLookup|null $geoip_lookup
+     */
+    private $geoip_lookup;
+
+    /**
      * Temporary storage for request data before final logging (e.g., awaiting status code).
      *
      * @since 1.0.0
@@ -68,10 +78,11 @@ class Middleware {
      * @param PolicyEngine  $policy_engine  The policy engine instance.
      * @param RequestLogger $request_logger The request logger instance.
      */
-    public function __construct( RulesEngine $rules_engine, PolicyEngine $policy_engine, RequestLogger $request_logger ) {
+    public function __construct( RulesEngine $rules_engine, PolicyEngine $policy_engine, RequestLogger $request_logger, GeoIPLookup $geoip_lookup = null  ) {
         $this->rules_engine   = $rules_engine;
         $this->policy_engine  = $policy_engine;
         $this->request_logger = $request_logger;
+        $this->geoip_lookup   = $geoip_lookup;
     }
 
     /**
@@ -94,9 +105,18 @@ class Middleware {
             }
         }
 
+        $country_code = null;
+         if ( $this->geoip_lookup && filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+                $geoip_data = $this->geoip_lookup->get_geoip_data( $ip );
+                if ( $geoip_data && ! empty( $geoip_data->country_code ) && $geoip_data->country_code !== 'ZZ' ) {
+                    $country_code = $geoip_data->country_code;
+                }
+            }
+        
         $data = [
             'request_time' => current_time( 'mysql', true ),
             'ip'           => $ip,
+            'country_code' => $country_code,
             'method'       => $method,
             'endpoint'     => $endpoint,
             'user_id'      => $user_id ?: null,

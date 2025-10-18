@@ -13,13 +13,14 @@ namespace WPRateLimiter;
 
 use WPRateLimiter\DB\Schema;
 use WPRateLimiter\DB\RequestModel;
-use WPRateLimiter\Core\Middleware; 
+use WPRateLimiter\Core\Middleware;
 use WPRateLimiter\Core\RulesEngine;
 use WPRateLimiter\Core\PolicyEngine;
 use WPRateLimiter\Core\RequestLogger;
 use WPRateLimiter\Admin\AdminPage;
 use WPRateLimiter\Admin\RestAPI;
-use WPRateLimiter\Admin\Settings; 
+use WPRateLimiter\Admin\Settings;
+use WPRateLimiter\GeoIP\GeoIPLookup;
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
@@ -81,14 +82,16 @@ class RLM_Loader {
 
         // Include other required classes manually for now, will transition to autoloader.
         require_once RLM_PLUGIN_DIR . 'includes/DB/Schema.php';
-        require_once RLM_PLUGIN_DIR . 'includes/DB/RequestModel.php'; 
+        require_once RLM_PLUGIN_DIR . 'includes/DB/RequestModel.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/Middleware.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/RulesEngine.php';
         require_once RLM_PLUGIN_DIR . 'includes/Core/PolicyEngine.php';
-        require_once RLM_PLUGIN_DIR . 'includes/Core/RequestLogger.php'; 
+        require_once RLM_PLUGIN_DIR . 'includes/Core/RequestLogger.php';
         require_once RLM_PLUGIN_DIR . 'includes/Admin/AdminPage.php';
-        require_once RLM_PLUGIN_DIR . 'includes/Admin/RestAPI.php'; 
-        require_once RLM_PLUGIN_DIR . 'includes/Admin/Settings.php';   
+        require_once RLM_PLUGIN_DIR . 'includes/Admin/RestAPI.php';
+        require_once RLM_PLUGIN_DIR . 'includes/Admin/Settings.php';
+        require_once RLM_PLUGIN_DIR . 'includes/GeoIP/GeoIPLookup.php';
+        require_once RLM_PLUGIN_DIR . 'includes/DB/GeoIPCacheModel.php'; 
     }
 
     /**
@@ -127,10 +130,12 @@ class RLM_Loader {
      */
     private function define_public_hooks() {
         $rules_engine  = new RulesEngine();
+        $geoip_cache_model = new GeoIPCacheModel();
         $policy_engine = new PolicyEngine();
         $request_model  = new RequestModel(); 
         $request_logger = new RequestLogger( $request_model );
-        $middleware     = new Middleware( $rules_engine, $policy_engine, $request_logger );
+        $geoip_lookup   = new GeoIPLookup( $geoip_cache_model );
+        $middleware     = new Middleware( $rules_engine, $policy_engine, $request_logger, $geoip_lookup );
         $rest_api       = new RestAPI( $request_model );
         
         // Intercept REST API requests before dispatching.
