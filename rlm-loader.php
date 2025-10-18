@@ -13,6 +13,7 @@ namespace WPRateLimiter;
 
 use WPRateLimiter\DB\Schema;
 use WPRateLimiter\DB\RequestModel;
+use WPRateLimiter\DB\GeoIPCacheModel;
 use WPRateLimiter\Core\Middleware;
 use WPRateLimiter\Core\RulesEngine;
 use WPRateLimiter\Core\PolicyEngine;
@@ -91,7 +92,7 @@ class RLM_Loader {
         require_once RLM_PLUGIN_DIR . 'includes/Admin/RestAPI.php';
         require_once RLM_PLUGIN_DIR . 'includes/Admin/Settings.php';
         require_once RLM_PLUGIN_DIR . 'includes/GeoIP/GeoIPLookup.php';
-        require_once RLM_PLUGIN_DIR . 'includes/DB/GeoIPCacheModel.php'; 
+        require_once RLM_PLUGIN_DIR . 'includes/DB/GeoIPCacheModel.php';
     }
 
     /**

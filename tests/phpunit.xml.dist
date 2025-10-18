@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="bootstrap.php"
+         backupGlobals="false"
+         colors="true"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         processIsolation="false"
+         stopOnFailure="false"
+         cacheResult="false"
+         forceCoversAnnotation="false">
+    <testsuites>
+        <testsuite name="WP API Rate Limiter Test Suite">
+            <directory suffix="Test.php">./unit</directory>
+            <!-- <directory suffix="Test.php">./integration</directory> -->
+        </testsuite>
+    </testsuites>
+    <php>
+        <!-- Define the path to the WordPress install for testing -->
+        <env name="WP_TESTS_DIR" value="/tmp/wordpress-tests-lib"/>
+        <env name="WP_CORE_DIR" value="/var/www/html/wordpress/"/>
+        <env name="WP_PHP_BINARY" value="php"/>
+        <ini name="display_errors" value="1" />
+        <ini name="display_startup_errors" value="1" />
+    </php>
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">../includes</directory>
+            <file>../rlm-loader.php</file>
+            <file>../rlm-main.php</file>
+        </include>
+        <exclude>
+            <directory>../vendor</directory>
+            <directory>../tests</directory>
+        </exclude>
+    </coverage>
+</phpunit>
